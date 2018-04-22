@@ -27,7 +27,6 @@ defmodule CrawlerMain do
   defp process({:ok, start_page, end_page}) do
     start_url = Tools.make_wiki_url(start_page)
 
-    Logger.info "TADAAAA"
     DownloadServer.get(start_url)
 
     end_url = Tools.make_wiki_url(end_page)
