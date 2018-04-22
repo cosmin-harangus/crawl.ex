@@ -5,6 +5,7 @@ defmodule DownloadServer do
   @name DownloadServer
 
   def start_link do
+    Logger.debug "DownloadServer starting..."
     Supervisor.start_link(__MODULE__, :ok, name: @name)
   end
 
@@ -13,7 +14,7 @@ defmodule DownloadServer do
       worker(DownloadWorker, [])
     ]
 
-    supervise(children, strategy: :simple_one_for_one)
+    supervise(children, strategy: :one_for_one)
   end
 
   def get(url) do

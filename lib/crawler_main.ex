@@ -11,6 +11,10 @@ defmodule CrawlerMain do
     |> process
   end
 
+  def main() do
+    main(System.argv())
+  end
+
   defp parse_args(args) do
     case OptionParser.parse(args) do
       { _, [start_page, end_page], _ } -> {:ok, start_page, end_page}

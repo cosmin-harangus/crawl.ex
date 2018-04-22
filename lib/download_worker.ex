@@ -3,8 +3,9 @@ defmodule DownloadWorker do
   require Logger
 
   # Client
-  def start_link(state, opts \\ []) do
-    GenServer.start_link(__MODULE__, state, opts)
+  def start_link() do
+    Logger.debug "DownloadWorker starting..."
+    GenServer.start_link(__MODULE__, :ok, [])
   end
 
   def init(_args) do
@@ -17,6 +18,9 @@ defmodule DownloadWorker do
       |> Enum.take_random(1)
       |> Enum.at(0)
 
+    Logger.debug("NODES: #{Node.list()}")
+    Logger.debug("Self node: #{Node.self()}")
+    Logger.debug("Chosen node: #{node}")
     Logger.debug("Send GET #{url} request to node #{node}")
     :rpc.call(:"#{node}", DownloadWorker, :get, [url, self()])
   end
