@@ -32,7 +32,8 @@ defmodule Crawler.Mixfile do
   defp deps do
     [
       {:httpoison, "~> 1.1.1"},
-      {:floki, "~> 0.20.1"}
+      {:floki, "~> 0.20.1"},
+      {:cookie_jar, "~> 1.0"}
     ]
   end
 end

@@ -1,15 +1,18 @@
 defmodule Tools do
-  @wikipedia_base_url "https://en.wikipedia.org/wiki"
+  @wikipedia "https://en.wikipedia.org"
+  @wiki_path "#{@wikipedia}/wiki"
 
-  def make_wiki_url(page), do: @wikipedia_base_url <> "/" <> page
-  
-  def is_wiki_url?(url), do: String.starts_with?(url, @wikipedia_base_url)
+  def make_wiki_url(s), do: @wiki_path <> "/" <> s
+
+  def is_wiki_url?(url), do: String.starts_with?(url, @wikipedia) or not(String.starts_with?(url, "http"))
 
   def render_path(path), do: "[" <> Enum.join(path, " ~> ") <> "]"
 
   def extract_urls(html) do
-    Floki.find(html, "a")
-    |> Enum.map(fn [{"a", [{"href", url}]}] -> url end)
-    |> Enum.filter(&is_wiki_url?/1)
+    html
+    |> Floki.find("a")
+    |> Floki.attribute("href")
+    |> Enum.filter(fn x -> String.starts_with?(x, "/wiki") end)
+    |> Enum.map(fn x -> @wikipedia <> "/" <> x end)
   end
 end

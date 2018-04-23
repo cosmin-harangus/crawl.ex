@@ -51,8 +51,10 @@ defmodule CrawlerMain do
 
         Logger.info "Visiting page #{current_url}. Current path: #{Tools.render_path(current_path)}"
 
-        urls = Tools.extract_urls(content)
-
+        urls =
+          Tools.extract_urls(content)
+          |> Enum.take_random(5)
+        # Logger.debug "Urls found in page: #{Enum.join(urls, "\n")}"
         urls
         |> Enum.each(&DownloadServer.get/1)
 
@@ -65,6 +67,11 @@ defmodule CrawlerMain do
 
         requested
         |> wait_for_response(end_url, @max_retries)
+      {:page_redirect, current_url, redirect_url} ->
+        current_path = requested[current_url]
+
+        Logger.info "Visiting page #{current_url}. Redirected to #{redirect_url}. Current path: #{Tools.render_path(current_path)}"
+
     after
       1_000 ->
         in_progress = map_size(requested)
