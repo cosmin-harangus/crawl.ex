@@ -28,7 +28,6 @@ defmodule Tools do
     |> Floki.attribute("href")
     |> Enum.filter(fn x -> String.starts_with?(x, "http://") or String.starts_with?(x, "https://") end)
     |> Enum.map(fn x -> x |> String.split("#", parts: 2) |> Enum.at(0) end)
-    # |> Enum.filter(fn x -> String.contains?(x, "hexpm") or String.contains?(x, "github") end)
   end
 
   def extract_cookies(headers) do

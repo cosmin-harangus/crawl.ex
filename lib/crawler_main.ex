@@ -5,6 +5,10 @@ defmodule CrawlerMain do
 
   @timeout 1_000
 
+  def test do
+    main(["3","20","https://hexdocs.pm/"])
+  end
+
   def main(args) do
     args
     |> parse_args
@@ -93,7 +97,7 @@ defmodule CrawlerMain do
         MapSet.new []
       end
 
-    Logger.debug "[#{inspect self()}] #{current_url} handle_page_ok: urls=#{inspect urls}"
+    Logger.debug "[#{inspect self()}] #{current_url} handle_page_ok: urls=#{inspect urls} current_path=#{current_path}"
 
     new_jobs =
       if Enum.count(current_path) < depth do
@@ -105,8 +109,6 @@ defmodule CrawlerMain do
         %{}
       end
 
-    Map.keys(new_jobs)
-    |> Enum.each(&download/1)
 
     new_in_progress =
       in_progress
@@ -120,12 +122,16 @@ defmodule CrawlerMain do
       |> Map.put( :in_progress, new_in_progress)
 
 
+    Map.keys(new_jobs)
+    |> Enum.each(&download/1)
+
     Logger.debug "[#{inspect self()}] #{current_url} DONE. new_args=#{inspect new_args}"
 
     new_args
   end
 
   defp download(url) do
+    Logger.debug "[#{inspect self()}] download url=#{url}"
     # DownloadServer.get(url, self())
     node =
       [Node.self() | Node.list()]
