@@ -3,7 +3,7 @@ defmodule Tools do
     Map.to_list(results)
     |> Enum.sort_by(fn {url, _path} -> url end)
     |> Enum.sort_by(fn {_url, path} -> Enum.count(path) end)
-    |> Enum.map(fn {url, path} -> "  #{url} ----------------> #{Tools.render_path(path)}" end)
+    |> Enum.map(fn {url, path} -> "  #{url} ----------------> #{Tools.render_path(path ++ [url])}" end)
   end
 
   def render_path(path) do

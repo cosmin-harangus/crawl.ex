@@ -39,7 +39,7 @@ defmodule CrawlerMain do
     download(start_url)
 
     config = %{:max_depth => max_depth, :fork_factor => fork_factor}
-    initial_state = %{ :in_progress =>%{start_url => [start_url]}, :results => %{} }
+    initial_state = %{ :in_progress =>%{start_url => []}, :results => %{} }
 
     wait_for_response(config, initial_state)
 
@@ -116,7 +116,7 @@ defmodule CrawlerMain do
   end
 
   def compute_jobs(state, current_path, urls, max_depth) do
-    if Enum.count(current_path) < max_depth do
+    if Enum.count(current_path) < max_depth - 1 do
       urls
       |> Enum.filter(fn u -> not(State.contains(state, u)) end)
       |> Enum.reduce(%{},fn (url, acc) -> Map.put(acc, url, [url | current_path]) end)
