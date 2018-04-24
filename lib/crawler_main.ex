@@ -3,7 +3,7 @@ defmodule CrawlerMain do
   require DownloadServer
   require Tools
 
-  @timeout 1_000
+  @timeout 3_000
 
   def test do
     main(["3","20","https://hexdocs.pm/"])
@@ -50,11 +50,11 @@ defmodule CrawlerMain do
     receive do
       {:page_ok, url, response} ->
         handle_page_ok(config, state, url, response)
-        |> check_stop_condition(config)
+        |> check_termination(config)
 
       {:page_error, url, reason} ->
         handle_page_error(state, url, reason)
-        |> check_stop_condition(config)
+        |> check_termination(config)
     after
       @timeout ->
         IO.puts "Timeout."
@@ -62,8 +62,8 @@ defmodule CrawlerMain do
     end
   end
 
-  defp check_stop_condition({:processing, new_state}, config), do: wait_for_response(config, new_state)
-  defp check_stop_condition({:done, results}, _) do
+  defp check_termination({:processing, new_state}, config), do: wait_for_response(config, new_state)
+  defp check_termination({:done, results}, _) do
     IO.puts "*** All downloads are finished."
     print_results(results)
   end
@@ -80,7 +80,7 @@ defmodule CrawlerMain do
 
       state
       |> State.remove_in_progress(url)
-      |> State.get_results()
+      |> State.check_termination()
   end
 
   defp handle_page_ok(config, state, current_url, response) do
@@ -102,7 +102,7 @@ defmodule CrawlerMain do
     |> State.add_result(current_url, current_path)
     |> State.remove_in_progress(current_url)
     |> State.add_in_progress(jobs)
-    |> State.get_results()
+    |> State.check_termination()
   end
 
   def extract_urls(%{content_type: content_type, content: content}, fork_factor) do

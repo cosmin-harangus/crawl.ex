@@ -1,5 +1,5 @@
 defmodule State do
-  def get_results(%{in_progress: in_progress, results: results} = state) do
+  def check_termination(%{in_progress: in_progress, results: results} = state) do
     if Tools.empty_map?(in_progress) do
       {:done, results}
     else
