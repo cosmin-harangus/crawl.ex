@@ -15,10 +15,6 @@ defmodule CrawlerMain do
     |> process
   end
 
-  def main() do
-    main(System.argv())
-  end
-
   defp parse_args(args) do
     case OptionParser.parse(args) do
       { _, [depth, fork_factor, start_url], _ } -> {:ok, elem(Integer.parse(depth),0), elem(Integer.parse(fork_factor), 0), start_url}
@@ -44,38 +40,52 @@ defmodule CrawlerMain do
       :in_progress =>%{start_url => [start_url]},
       :downloaded => %{}
     })
+
+    IO.puts "*** Exit. "
   end
 
   defp wait_for_response(args) do
     receive do
       {:page_ok, url, status, content_type, content} ->
         handle_page_ok(args, url, status, content_type, content)
-        |> wait_for_response()
+        |> check_stop_condition()
 
       {:page_error, url, reason} ->
         handle_page_error(args, url, reason)
-        |> wait_for_response()
+        |> check_stop_condition()
     after
-      @timeout -> handle_giveup(args)
+      @timeout ->
+        IO.puts "Timeout."
+        IO.puts "*** Downloads in progress: #{inspect args[:in_progress]}"
+        print_results(args[:downloaded])
     end
   end
 
-  defp handle_giveup(%{in_progress: in_progress, downloaded: downloaded}) do
-    IO.puts "*** Timeout expired."
-    IO.puts "*** Downloads in progress: #{inspect in_progress}"
+  defp check_stop_condition({:continue, new_args}), do: wait_for_response(new_args)
+  defp check_stop_condition({:done, results}) do
+    IO.puts "*** All downloads are finished."
+    print_results(results)
+  end
+
+  defp print_results(downloaded) do
     IO.puts "*** Downloaded:"
 
     Tools.render_results(downloaded)
     |> Enum.each(&IO.puts/1)
-
-    IO.puts "*** Exit. "
   end
 
-  defp handle_page_error(%{in_progress: in_progress} = args, url, reason) do
+  defp handle_page_error(%{in_progress: in_progress, downloaded: downloaded} = args, url, reason) do
       Logger.warn "[#{inspect self()}] Error while requested page #{url}. Reason: #{inspect reason}"
 
-      args
-      |> Map.put( :in_progress, Map.delete(in_progress, url))
+      new_args =
+        args
+        |> Map.put( :in_progress, Map.delete(in_progress, url))
+
+      if Enum.empty?(in_progress) do
+        {:done, downloaded}
+      else
+        {:continue, new_args}
+      end
   end
 
   defp handle_page_ok(args, current_url, status, content_type, content) do
@@ -115,19 +125,21 @@ defmodule CrawlerMain do
       |> Map.delete(current_url)
       |> Map.merge(new_jobs)
 
+    if Map.keys(new_in_progress) |> Enum.empty?() do
+      {:done, downloaded}
+    else
+      new_args =
+        args
+        |> Map.put( :downloaded, new_downloaded)
+        |> Map.put( :in_progress, new_in_progress)
 
-    new_args =
-      args
-      |> Map.put( :downloaded, new_downloaded)
-      |> Map.put( :in_progress, new_in_progress)
+      Map.keys(new_jobs)
+      |> Enum.each(&download/1)
 
+      Logger.debug "[#{inspect self()}] #{current_url} Exit handle_page_ok. new_args=#{inspect new_args}"
 
-    Map.keys(new_jobs)
-    |> Enum.each(&download/1)
-
-    Logger.debug "[#{inspect self()}] #{current_url} DONE. new_args=#{inspect new_args}"
-
-    new_args
+      {:continue, new_args}
+    end
   end
 
   defp download(url) do
