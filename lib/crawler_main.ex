@@ -99,7 +99,7 @@ defmodule CrawlerMain do
     |> Enum.each(&download/1)
 
     state
-    |> State.add_result(current_url)
+    |> State.add_result(current_url, current_path)
     |> State.remove_in_progress(current_url)
     |> State.add_in_progress(jobs)
     |> State.get_results()

@@ -23,9 +23,9 @@ defmodule State do
     |> Map.put( :in_progress, Map.delete(in_progress, url))
   end
 
-  def add_result(%{in_progress: in_progress, results: results} = state, url), do:
+  def add_result(%{in_progress: in_progress, results: results} = state, url, result), do:
     state
-    |> Map.put(:results, Map.put(results, url, in_progress[url]))
+    |> Map.put(:results, Map.put(results, url, result))
 
   def contains(%{in_progress: in_progress, results: results}, url), do:
     Map.has_key?(results, url) or Map.has_key?(in_progress, url)
