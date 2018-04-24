@@ -49,24 +49,6 @@ defmodule DownloadWorker do
     {:noreply, newState}
   end
 
-  # def handle_info(%HTTPoison.AsyncStatus{id: id, code: code}, {url: url, client: client}) do
-  #   Logger.debug "DownloadWorker.handle_info: AsyncStatus(#{inspect id}, #{inspect code}). State = #{inspect state}"
-  #   Logger.info("HTTP status #{code} received for #{url}")
-  #
-  #   if code >= 400 do
-  #
-  #     send(parent, {:page_error, url, "Bad HTTP status #{code}"})
-  #
-  #     :hackney.stop_async id
-  #
-  #     Logger.debug "newState=#{inspect newState}"
-  #     {:noreply, newState}
-  #   else
-  #     {:noreply, state}
-  #   end
-  #
-  # end
-
   def handle_info(%HTTPoison.AsyncHeaders{id: id, headers: headers}, %{cookie_jar: cookie_jar} = state) do
     Logger.debug "#{inspect self()} DownloadWorker.handle_info: AsyncHeaders: id=#{inspect id}, \n*** Headers=#{inspect headers},\n*** State = #{inspect state}"
 
@@ -80,7 +62,7 @@ defmodule DownloadWorker do
     {:noreply, newState}
   end
 
-  def handle_info(%HTTPoison.AsyncChunk{id: id, chunk: chunk}, %{url: url, content: content} = state) do
+  def handle_info(%HTTPoison.AsyncChunk{chunk: chunk}, %{content: content} = state) do
     # Logger.debug "DownloadWorker.handle_info: AsyncChunk(#{inspect id}, ...). State = {url: #{url},...}"
     newState = Map.put(state, :content, content <> chunk)
 
@@ -90,31 +72,15 @@ defmodule DownloadWorker do
   def handle_info(%HTTPoison.AsyncEnd{id: id}, %{status: status, content: content, url: url, client: client, content_type: content_type} = state) do
     Logger.debug "#{inspect self()} DownloadWorker.handle_info: AsyncEnd(#{inspect id}). State: url: #{url}, client: #{inspect client}"
 
-    send(client, {:page_ok, url, status, content_type, content})
+    send(client, {:page_ok, url, %{status: status, content_type: content_type, content: content}})
 
     {:noreply, state}
   end
 
-  def handle_info(%HTTPoison.Error{id: _id, reason: reason},  %{url: url, client: client} = state) do
+  def handle_info(%HTTPoison.Error{reason: reason}, state) do
     Logger.debug "#{inspect self()} HTTP error: #{reason}"
     {:noreply, state}
   end
-
-  #
-  # def handle_info(%HTTPoison.AsyncRedirect{id: id, to: redirect_url}, state) do
-  #   Logger.debug "DownloadWorker.handle_info: AsyncRedirect(#{inspect id}, #{redirect_url}). State = ..."
-  #   content = get_in(state, [:requests, id, :content])
-  #   url = get_in(state, [:requests, id, :url])
-  #   client = get_in(state, [:requests, id, :client])
-  #
-  #   Logger.debug("HTTP redirected from url: #{url} to #{redirect_url}")
-  #
-  #   send(client, {:page_redirect, url, redirect_url})
-  #
-  #   newState = pop_in(state, [:requests, id])
-  #
-  #   {:noreply, newState}
-  # end
 
   def handle_info(request, state) do
     Logger.debug "#{inspect self()} Unknown message received: request=#{inspect request}, state=#{inspect state}"

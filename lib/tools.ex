@@ -1,8 +1,8 @@
 defmodule Tools do
   def render_results(results) do
     Map.to_list(results)
-    |> Enum.sort_by(fn {url, path} -> url end)
-    |> Enum.sort_by(fn {url, path} -> Enum.count(path) end)
+    |> Enum.sort_by(fn {url, _path} -> url end)
+    |> Enum.sort_by(fn {_url, path} -> Enum.count(path) end)
     |> Enum.map(fn {url, path} -> "  #{url} ----------------> #{Tools.render_path(path)}" end)
   end
 
@@ -16,7 +16,7 @@ defmodule Tools do
   end
 
   def content_type(headers) do
-      case Enum.find(headers, fn {k, v} -> String.downcase(k) == "content-type" end) do
+      case Enum.find(headers, fn {k, _v} -> String.downcase(k) == "content-type" end) do
         nil -> "text/html"
         {_k, v} -> v
       end
@@ -43,4 +43,6 @@ defmodule Tools do
       end
     end)
   end
+
+  def empty_map?(m), do: Map.keys(m) |> Enum.empty?()
 end
