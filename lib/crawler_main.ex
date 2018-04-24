@@ -35,53 +35,92 @@ defmodule CrawlerMain do
 
     end_url = Tools.make_wiki_url(end_page)
 
-    wait_for_response(%{start_url => [start_url]}, end_url, @max_retries)
+    %{
+      :in_progress =>%{start_url => [start_url]},
+      :downloaded => MapSet.new
+    }
+    |> wait_for_response(end_url, @max_retries)
   end
 
-  defp wait_for_response(requested, end_url, retries) do
+  defp wait_for_response(args, end_url, retries) do
     receive do
       {:page_ok, ^end_url, _} ->
-        path = requested[end_url]
-        Logger.info "*****************************************************************************************************"
-        Logger.info "*** End page #{end_url} reached with path: #{Tools.render_path(path)}"
-        Logger.info "*****************************************************************************************************"
+        handle_end_page(args, end_url)
 
-      {:page_ok, current_url, content} ->
-        current_path = requested[current_url]
-
-        Logger.info "Visiting page #{current_url}. Current path: #{Tools.render_path(current_path)}"
-
-        urls =
-          Tools.extract_urls(content)
-          |> Enum.take_random(5)
-        # Logger.debug "Urls found in page: #{Enum.join(urls, "\n")}"
-        urls
-        |> Enum.each(&DownloadServer.get/1)
-
-        urls
-        |> Enum.reduce(requested, fn (url, acc) -> Map.put(acc, url, [url | current_path]) end)
+      {:page_ok, url, content} ->
+        handle_page_ok(args, url, content)
         |> wait_for_response(end_url, @max_retries)
 
       {:page_error, url, reason} ->
-        Logger.warn "Error while requested page #{url}. Reason: #{reason}"
-
-        requested
+        handle_page_error(args, url, reason)
         |> wait_for_response(end_url, @max_retries)
-      {:page_redirect, current_url, redirect_url} ->
-        current_path = requested[current_url]
 
-        Logger.info "Visiting page #{current_url}. Redirected to #{redirect_url}. Current path: #{Tools.render_path(current_path)}"
+      # {:page_redirect, current_url, redirect_url} ->
+      #   current_path = requested[current_url]
+      #
+      #   Logger.info "Visiting page #{current_url}. Redirected to #{redirect_url}. Current path: #{Tools.render_path(current_path)}"
 
+      other -> Logger.warn "Other message received: #{other}"
     after
       1_000 ->
-        in_progress = map_size(requested)
         if retries > 0 do
-          Logger.info "Still waiting: no results received yet. Downloads in progress: #{in_progress}. Retries left: #{retries}"
-          wait_for_response(requested, end_url, retries - 1)
+          handle_retry(args, retries)
+          |> wait_for_response(end_url, retries - 1)
         else
-          Logger.info "Timeout expired. Downloads in progress: #{in_progress}. Exit. "
+          handle_giveup(args)
         end
     end
   end
 
+  defp handle_giveup(%{in_progress: in_progress, downloaded: downloaded} = args) do
+    Logger.info "*** Timeout expired.\n*** Downloads in progress: #{inspect in_progress}\n*** Downloaded: #{inspect downloaded}\n*** Exit. "
+  end
+
+  defp handle_retry(%{in_progress: in_progress, downloaded: downloaded} = args, retries_left) do
+    Logger.info "Still waiting: no results received yet.\n*** Downloads in progress: #{map_size(in_progress)}\n*** Downloaded: #{map_size(downloaded)}. Retries left: #{retries_left}"
+    args
+  end
+
+  defp handle_page_error(args, url, reason) do
+      Logger.warn "Error while requested page #{url}. Reason: #{reason}"
+      args
+  end
+
+  defp handle_end_page(%{in_progress: in_progress}, url) do
+    path = in_progress[url]
+    Logger.info "*****************************************************************************************************"
+    Logger.info "*** End page #{url} reached with path: #{Tools.render_path(path)}"
+    Logger.info "*****************************************************************************************************"
+  end
+
+  defp handle_page_ok(%{in_progress: in_progress, downloaded: downloaded} = args, current_url, content) do
+    current_path = in_progress[current_url]
+
+    Logger.info "Page downloaded #{current_url}. Current path: #{Tools.render_path(current_path)}"
+
+    urls =
+      Tools.extract_urls(content)
+      # |> Enum.take_random(1) # !!!!!!!!!!! FIXME
+
+    Logger.info "Urls found in page: [#{Enum.join(urls, "\n")}]"
+
+
+    newInProgress =
+      urls
+      |> Enum.reduce(%{},fn (url, acc) -> Map.put(acc, url, [url | current_path]) end)
+
+    urls
+    |> Enum.each(&DownloadServer.get/1)
+
+    %{
+      :downloaded =>
+        downloaded
+        |> MapSet.put(current_url),
+
+      :in_progress =>
+        in_progress
+        |> Map.delete(current_url)
+        |> Map.merge(newInProgress)
+    }
+  end
 end

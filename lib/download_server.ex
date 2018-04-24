@@ -4,21 +4,23 @@ defmodule DownloadServer do
 
   @name DownloadWorker
 
-  def start_link do
-    Logger.debug "DownloadServer starting..."
-    Supervisor.start_link(__MODULE__, :ok, name: @name)
-  end
-
-  def init(:ok) do
-    jar = CookieJar.new()
-    Supervisor.init([DownloadWorker], strategy: :simple_one_for_one)
+  ### client API
+  def start_link(cookie_jar) do
+    Supervisor.start_link(__MODULE__, cookie_jar, name: @name)
   end
 
   def get(url) do
-    Logger.debug("DownloadServer.get(#{url})")
-    {:ok, worker} = Supervisor.start_child(@name, [])
-    GenServer.cast(worker, {:get, url, self()})
+    {:ok, worker} = Supervisor.start_child(@name, [url, self()])
+    Logger.debug("DownloadServer.get(#{url}) sent to #{inspect worker}")
   end
+
+  ### server callbaks
+  def init(cookie_jar) do
+    spec = [ worker(DownloadWorker, [cookie_jar]) ]
+
+    Supervisor.init(spec, strategy: :simple_one_for_one)
+  end
+
 
   # def get(url) do
   #   node =
