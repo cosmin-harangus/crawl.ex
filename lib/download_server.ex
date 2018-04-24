@@ -9,9 +9,15 @@ defmodule DownloadServer do
     Supervisor.start_link(__MODULE__, cookie_jar, name: @name)
   end
 
-  def get(url) do
-    {:ok, worker} = Supervisor.start_child(@name, [url, self()])
-    Logger.debug("DownloadServer.get(#{url}) sent to #{inspect worker}")
+  def get(url, client) do
+    Logger.debug "[#{inspect self()}] DownloadServer.get: url=#{url}"
+
+    case Supervisor.start_child(@name, [url, client]) do
+      {:ok, worker} ->
+        Logger.debug("#{inspect self()} DownloadServer.get: #{url} sent to #{inspect worker}")
+      {:error, reason} ->
+        send(client, {:page_error, url, reason})
+    end
   end
 
   ### server callbaks
@@ -21,18 +27,4 @@ defmodule DownloadServer do
     Supervisor.init(spec, strategy: :simple_one_for_one)
   end
 
-
-  # def get(url) do
-  #   node =
-  #     [Node.self() | Node.list()]
-  #     |> Enum.take_random(1)
-  #     |> Enum.at(0)
-  #
-  #   Logger.debug("NODES: #{Node.list()}")
-  #   Logger.debug("Self node: #{Node.self()}")
-  #   Logger.debug("Chosen node: #{node}")
-  #   Logger.debug("Send GET #{url} request to node #{node}")
-  #   Logger.debug("PRocesses: #{inspect(Process.get())}")
-  #   :rpc.call(:"#{node}", DownloadWorker, :get, [url, self()])
-  # end
 end

@@ -1,10 +1,10 @@
 defmodule Tools do
-  @wikipedia "https://en.wikipedia.org"
-  @wiki_path "#{@wikipedia}/wiki"
-
-  def make_wiki_url(s), do: @wiki_path <> "/" <> s
-
-  def is_wiki_url?(url), do: String.starts_with?(url, @wikipedia) or not(String.starts_with?(url, "http"))
+  def render_results(results) do
+    Map.to_list(results)
+    |> Enum.sort_by(fn {url, path} -> url end)
+    |> Enum.sort_by(fn {url, path} -> Enum.count(path) end)
+    |> Enum.map(fn {url, path} -> "  #{url} ----------------> #{Tools.render_path(path)}" end)
+  end
 
   def render_path(path) do
     path_as_str =
@@ -15,13 +15,20 @@ defmodule Tools do
      "[#{path_as_str}]"
   end
 
+  def content_type(headers) do
+      case Enum.find(headers, fn {k, v} -> String.downcase(k) == "content-type" end) do
+        nil -> "text/html"
+        {_k, v} -> v
+      end
+  end
+
   def extract_urls(html) do
     html
     |> Floki.find("a")
     |> Floki.attribute("href")
-    # |> Enum.filter(fn x -> String.starts_with?(x, "http://") or String.starts_with?(x, "https://") end)
-    |> Enum.filter(fn x -> String.starts_with?(x, "/wiki") end)
-    |> Enum.map(fn x -> @wikipedia <> "/" <> x end)
+    |> Enum.filter(fn x -> String.starts_with?(x, "http://") or String.starts_with?(x, "https://") end)
+    |> Enum.map(fn x -> x |> String.split("#", parts: 2) |> Enum.at(0) end)
+    # |> Enum.filter(fn x -> String.contains?(x, "hexpm") or String.contains?(x, "github") end)
   end
 
   def extract_cookies(headers) do
