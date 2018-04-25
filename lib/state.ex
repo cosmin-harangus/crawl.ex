@@ -8,10 +8,9 @@ defmodule State do
   end
 
   def add_in_progress(%{in_progress: in_progress} = state, jobs) do
-    in_progress = Map.merge(in_progress, jobs)
-
-    state
-    |> Map.put(:in_progress, in_progress)
+    %{state |
+      in_progress: Map.merge(in_progress, jobs)
+    }
   end
 
   def get_in_progress(state), do: state[:in_progress]
@@ -19,13 +18,15 @@ defmodule State do
   def get_in_progress(%{in_progress: in_progress}, url), do: in_progress[url]
 
   def remove_in_progress(%{in_progress: in_progress} = state, url) do
-    state
-    |> Map.put( :in_progress, Map.delete(in_progress, url))
+    %{state |
+      in_progress: Map.delete(in_progress, url)
+    }
   end
 
-  def add_result(%{in_progress: in_progress, results: results} = state, url, result), do:
-    state
-    |> Map.put(:results, Map.put(results, url, result))
+  def add_result(%{results: results} = state, url, result), do:
+    %{state |
+      results: Map.put(results, url, result)
+    }
 
   def contains(%{in_progress: in_progress, results: results}, url), do:
     Map.has_key?(results, url) or Map.has_key?(in_progress, url)

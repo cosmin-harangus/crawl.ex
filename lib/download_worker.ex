@@ -44,9 +44,10 @@ defmodule DownloadWorker do
   def handle_info(%HTTPoison.AsyncStatus{id: id, code: code}, %{url: url} = state) do
     Logger.debug "#{inspect self()} DownloadWorker.handle_info: AsyncStatus(#{inspect id}, 200) for url: #{url}"
 
-    newState = Map.put(state, :status, code)
-
-    {:noreply, newState}
+    {
+      :noreply,
+      %{state | status: code}
+    }
   end
 
   def handle_info(%HTTPoison.AsyncHeaders{id: id, headers: headers}, %{cookie_jar: cookie_jar} = state) do
@@ -58,23 +59,26 @@ defmodule DownloadWorker do
 
     CookieJar.pour(cookie_jar, cookies)
 
-    newState = Map.put(state, :content_type, Tools.content_type(headers))
-    {:noreply, newState}
+    {
+      :noreply,
+      %{state | content_type: Tools.content_type(headers)}
+    }
   end
 
   def handle_info(%HTTPoison.AsyncChunk{chunk: chunk}, %{content: content} = state) do
     # Logger.debug "DownloadWorker.handle_info: AsyncChunk(#{inspect id}, ...). State = {url: #{url},...}"
-    newState = Map.put(state, :content, content <> chunk)
-
-    {:noreply, newState}
+    {
+      :noreply,
+      %{state | content: content <> chunk}
+    }
   end
 
-  def handle_info(%HTTPoison.AsyncEnd{id: id}, %{status: status, content: content, url: url, client: client, content_type: content_type} = state) do
+  def handle_info(%HTTPoison.AsyncEnd{id: id}, %{status: status, content: content, url: url, client: client, content_type: content_type}) do
     Logger.debug "#{inspect self()} DownloadWorker.handle_info: AsyncEnd(#{inspect id}). State: url: #{url}, client: #{inspect client}"
 
     send(client, {:page_ok, url, %{status: status, content_type: content_type, content: content}})
 
-    {:noreply, state}
+    {:noreply, :terminated}
   end
 
   def handle_info(%HTTPoison.Error{reason: reason}, state) do
