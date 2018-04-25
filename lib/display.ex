@@ -23,6 +23,7 @@ defmodule Display do
 
   def handle_subscribe(:consumer, options, from, state) do
     Logger.debug "Display.handle_subscribe :consumer, #{inspect options}, #{inspect from}, #{inspect state}"
+    GenStage.ask(from, 100)
     {:automatic, state}
   end
 
@@ -32,7 +33,7 @@ defmodule Display do
   end
 
   def terminate(reason, state) do
-    Logger.debug "Display.terminate #{inspect reason}, #{inspect state}"
+    Logger.info "Display.terminate #{inspect reason}, #{inspect state}"
     IO.puts "*** results:"
 
     Tools.render_results(state)

@@ -41,21 +41,22 @@ defmodule CrawlerMain do
     {:ok, parser} = Parser.start_link(fork_factor)
     {:ok, feeder} = Feeder.start_link(max_depth)
     {:ok, display} = Display.start_link()
-    {:ok, ticker} = Ticker.start_link(@timeout)
+    # {:ok, ticker} = Ticker.start_link(@timeout)
 
     GenStage.sync_subscribe(parser, to: downloader)
     GenStage.sync_subscribe(feeder, to: parser)
     GenStage.sync_subscribe(downloader, to: feeder)
-    # GenStage.sync_subscribe(display, to: feeder)
-    GenStage.sync_subscribe(ticker, to: feeder)
+    GenStage.sync_subscribe(display, to: feeder)
+    # GenStage.sync_subscribe(ticker, to: feeder)
 
 
     Downloader.download(downloader, start_url)
 
-    Process.sleep(:infinity)
+    Process.sleep(10_000)
 
-    [downloader, parser, feeder, display]
-    |> Enum.each(&GenStage.stop/1)
+    GenStage.stop(feeder)
+    # [downloader, parser, feeder, display]
+    # |> Enum.each(&GenStage.stop/1)
 
     IO.puts "*** Exit. "
   end

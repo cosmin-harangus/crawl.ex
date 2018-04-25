@@ -16,7 +16,8 @@ defmodule Downloader do
       %{
         :buffer => [],
         :downloads_pending => %{},
-        :subscriptions => []
+        :subscriptions => [],
+        :demand_left => 0
       }
     }
   end
@@ -43,7 +44,14 @@ defmodule Downloader do
 
     {pulled, remaining} = buffer |> Enum.split(served)
 
-    {:noreply, pulled, %{state| buffer: remaining}}
+    {
+      :noreply,
+      pulled,
+      %{state|
+        buffer: remaining,
+        demand_left: max(0, demand - available)
+      }
+    }
   end
 
   def handle_events(jobs, _from, %{downloads_pending: downloads_pending} = state) do
@@ -65,18 +73,13 @@ defmodule Downloader do
   def handle_info({:page_ok, url, response} = msg, %{buffer: buffer, downloads_pending: downloads_pending} = state) do
     Logger.debug "Downloader.handle_info :page_ok #{inspect msg}, #{inspect state}"
     path = downloads_pending[url]
-
-    downloads_pending = Map.delete(downloads_pending, url)
-
-    buffer = Enum.concat(buffer, [{[url | path], response}])
-
+    
     state =
       %{ state |
-        downloads_pending: downloads_pending,
-        buffer: buffer
+        downloads_pending: Map.delete(downloads_pending, url),
+        buffer:  Enum.concat(buffer, [{[url | path], response}])
       }
-
-    {:noreply, [], state}
+    handle_demand(state[:demand_left], state)
   end
 
   def handle_info({:page_error, url, reason}, %{downloads_pending: downloads_pending} = state) do
