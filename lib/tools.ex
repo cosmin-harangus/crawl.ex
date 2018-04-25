@@ -1,6 +1,6 @@
 defmodule Tools do
   def render_results(results) do
-    Map.to_list(results)
+    results
     |> Enum.sort_by(fn {url, _path} -> url end)
     |> Enum.sort_by(fn {_url, path} -> Enum.count(path) end)
     |> Enum.map(fn {url, path} -> "  #{url} ----------------> #{Tools.render_path(path ++ [url])}" end)
@@ -45,4 +45,11 @@ defmodule Tools do
   end
 
   def empty_map?(m), do: Map.keys(m) |> Enum.empty?()
+
+  # def bind(f1, f2) do
+  #   fn m,x ->
+  #     {m1, y} = f1(m, x)
+  #     f2(m, y)
+  #   end
+  # end
 end

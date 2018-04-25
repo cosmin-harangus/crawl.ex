@@ -3,7 +3,7 @@ defmodule CrawlerMain do
   require DownloadServer
   require Tools
 
-  @timeout 3_000
+  @timeout 1_000
 
   def test do
     main(["3","20","https://hexdocs.pm/"])
@@ -36,103 +36,27 @@ defmodule CrawlerMain do
 
   defp process({:ok, max_depth, fork_factor, start_url}) do
     Logger.info "[#{inspect self()}] Starting crawling with depth=#{inspect max_depth}, fork_factor=#{inspect fork_factor}, start_url=#{start_url}"
-    download(start_url)
 
-    config = %{:max_depth => max_depth, :fork_factor => fork_factor}
-    initial_state = %{ :in_progress =>%{start_url => []}, :results => %{} }
+    {:ok, downloader} = Downloader.start_link()
+    {:ok, parser} = Parser.start_link(fork_factor)
+    {:ok, feeder} = Feeder.start_link(max_depth)
+    {:ok, display} = Display.start_link()
+    {:ok, ticker} = Ticker.start_link(@timeout)
 
-    wait_for_response(config, initial_state)
+    GenStage.sync_subscribe(parser, to: downloader)
+    GenStage.sync_subscribe(feeder, to: parser)
+    GenStage.sync_subscribe(downloader, to: feeder)
+    # GenStage.sync_subscribe(display, to: feeder)
+    GenStage.sync_subscribe(ticker, to: feeder)
+
+
+    Downloader.download(downloader, start_url)
+
+    Process.sleep(:infinity)
+
+    [downloader, parser, feeder, display]
+    |> Enum.each(&GenStage.stop/1)
 
     IO.puts "*** Exit. "
-  end
-
-  defp wait_for_response(config, state) do
-    receive do
-      {:page_ok, url, response} ->
-        handle_page_ok(config, state, url, response)
-        |> check_termination(config)
-
-      {:page_error, url, reason} ->
-        handle_page_error(state, url, reason)
-        |> check_termination(config)
-    after
-      @timeout ->
-        IO.puts "Timeout."
-        IO.puts "*** Downloads in progress: #{inspect State.get_in_progress(state)}"
-    end
-  end
-
-  defp check_termination({:processing, new_state}, config), do: wait_for_response(config, new_state)
-  defp check_termination({:done, results}, _) do
-    IO.puts "*** All downloads are finished."
-    print_results(results)
-  end
-
-  defp print_results(results) do
-    IO.puts "*** results:"
-
-    Tools.render_results(results)
-    |> Enum.each(&IO.puts/1)
-  end
-
-  defp handle_page_error(state, url, reason) do
-      Logger.warn "[#{inspect self()}] Error while requested page #{url}. Reason: #{inspect reason}"
-
-      state
-      |> State.remove_in_progress(url)
-      |> State.check_termination()
-  end
-
-  defp handle_page_ok(config, state, current_url, response) do
-    Logger.info "[#{inspect self()}] #{current_url} Enter handle_page_ok."
-    Logger.debug "[#{inspect self()}] #{current_url} handle_page_ok: args=#{inspect state}"
-
-    page_urls = extract_urls(response, config[:fork_factor])
-
-    Logger.debug "[#{inspect self()}] #{current_url} handle_page_ok: urls=#{inspect page_urls}"
-
-    current_path = State.get_in_progress(state, current_url)
-
-    jobs = compute_jobs(state, current_path, page_urls, config[:max_depth])
-
-    Map.keys(jobs)
-    |> Enum.each(&download/1)
-
-    state
-    |> State.add_result(current_url, current_path)
-    |> State.remove_in_progress(current_url)
-    |> State.add_in_progress(jobs)
-    |> State.check_termination()
-  end
-
-  def extract_urls(%{content_type: content_type, content: content}, fork_factor) do
-    if String.starts_with?(content_type, "text/html") do
-      Tools.extract_urls(content)
-      |> Enum.take_random(fork_factor)
-    else
-      []
-    end
-    |> MapSet.new
-  end
-
-  def compute_jobs(state, current_path, urls, max_depth) do
-    if Enum.count(current_path) < max_depth - 1 do
-      urls
-      |> Enum.filter(fn u -> not(State.contains(state, u)) end)
-      |> Enum.reduce(%{},fn (url, acc) -> Map.put(acc, url, [url | current_path]) end)
-    else
-      %{}
-    end
-  end
-
-  defp download(url) do
-    Logger.debug "[#{inspect self()}] download url=#{url}"
-    # DownloadServer.get(url, self())
-    node =
-      [Node.self() | Node.list()]
-      |> Enum.take_random(1)
-      |> Enum.at(0)
-
-    :rpc.call(:"#{node}", DownloadServer, :get, [url, self()])
   end
 end
